@@ -5,15 +5,15 @@ import IrrigationChart from './IrrigationChart'
 import { IrrigationRecord } from '@/lib/types'
 import { format, subDays } from 'date-fns'
 
-type Period = '7d' | '30d' | 'custom'
+type Period = '3d' | '7d' | '30d' | 'custom'
 type Metric = 'mm' | 'hours'
 
 export default function Dashboard() {
   const [records, setRecords] = useState<IrrigationRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [metric, setMetric] = useState<Metric>('mm')
-  const [period, setPeriod] = useState<Period>('7d')
-  const [fromDate, setFromDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'))
+  const [period, setPeriod] = useState<Period>('3d')
+  const [fromDate, setFromDate] = useState(format(subDays(new Date(), 3), 'yyyy-MM-dd'))
   const [toDate, setToDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
   const fetchData = useCallback(async () => {
@@ -37,7 +37,10 @@ export default function Dashboard() {
   const handlePeriodChange = (p: Period) => {
     setPeriod(p)
     const today = new Date()
-    if (p === '7d') {
+    if (p === '3d') {
+      setFromDate(format(subDays(today, 3), 'yyyy-MM-dd'))
+      setToDate(format(today, 'yyyy-MM-dd'))
+    } else if (p === '7d') {
       setFromDate(format(subDays(today, 7), 'yyyy-MM-dd'))
       setToDate(format(today, 'yyyy-MM-dd'))
     } else if (p === '30d') {
@@ -115,7 +118,7 @@ export default function Dashboard() {
 
               {/* Period selector */}
               <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-                {(['7d', '30d', 'custom'] as Period[]).map((p) => (
+                {(['3d', '7d', '30d', 'custom'] as Period[]).map((p) => (
                   <button
                     key={p}
                     onClick={() => handlePeriodChange(p)}
@@ -125,7 +128,7 @@ export default function Dashboard() {
                         : 'bg-white text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    {p === '7d' ? '7 dies' : p === '30d' ? '30 dies' : 'Personalitzat'}
+                    {p === '3d' ? '3 dies' : p === '7d' ? '7 dies' : p === '30d' ? '30 dies' : 'Personalitzat'}
                   </button>
                 ))}
               </div>
