@@ -104,6 +104,16 @@ export default function IrrigationChart({ records, metric }: Props) {
 
   const unit = metric === 'mm' ? 'mm' : 'h'
 
+  const allHidden = sectors.length > 0 && sectors.every(s => hiddenSectors.has(s))
+
+  const toggleAll = () => {
+    if (allHidden) {
+      setHiddenSectors(new Set())
+    } else {
+      setHiddenSectors(new Set(sectors))
+    }
+  }
+
   if (chartData.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-400">
@@ -113,6 +123,16 @@ export default function IrrigationChart({ records, metric }: Props) {
   }
 
   return (
+    <div>
+      {/* Botó deseleccionar / seleccionar tot */}
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={toggleAll}
+          className="text-xs font-medium px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+        >
+          {allHidden ? '☑ Seleccionar tots' : '☐ Deseleccionar tots'}
+        </button>
+      </div>
     <ResponsiveContainer width="100%" height={500}>
       <BarChart
         data={chartData}
@@ -167,5 +187,6 @@ export default function IrrigationChart({ records, metric }: Props) {
         ))}
       </BarChart>
     </ResponsiveContainer>
+    </div>
   )
 }
