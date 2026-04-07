@@ -26,40 +26,71 @@ interface Props {
   metric: 'mm' | 'hours'
 }
 
+// Label vertical sobre cada barra: "S14 · 2.5h"
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeBarLabel(numSector: number | string, hoursKey: string, chartData: any[]) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return function BarLabel(props: any) {
+    const { x, y, width, value, index } = props
+    if (!value || value === 0 || width < 5) return null
+
+    const hours = chartData[index]?.[hoursKey] ?? value
+    const cx = x + width / 2
+    const cy = y - 5
+
+    return (
+      <text
+        x={cx}
+        y={cy}
+        transform={`rotate(-90, ${cx}, ${cy})`}
+        textAnchor="start"
+        dominantBaseline="central"
+        fontSize={9}
+        fill="#1f2937"
+        fontWeight={600}
+      >
+        {`S${numSector} · ${Number(hours).toFixed(1)}h`}
+      </text>
+    )
+  }
+}
+
 export default function IrrigationChart({ records, metric }: Props) {
-  const { chartData, sectors } = useMemo(() => {
-    // Group by day
+  const { chartData, sectors, numSectorMap } = useMemo(() => {
     const byDay: Record<string, Record<string, number>> = {}
     const sectorSet = new Set<string>()
+    const numSectorMap: Record<string, number> = {}
 
     for (const r of records) {
       const day = format(new Date(r.data_inici), 'yyyy-MM-dd')
       if (!byDay[day]) byDay[day] = {}
 
-      const sectorName = r.sector
-      sectorSet.add(sectorName)
+      const s = r.sector
+      sectorSet.add(s)
+      numSectorMap[s] = r.num_sector
 
+      // Valor del mètric principal (mm o hores)
       const value = metric === 'mm' ? r.lamina_mm : r.durada_min / 60
-      byDay[day][sectorName] = (byDay[day][sectorName] || 0) + value
+      byDay[day][s] = (byDay[day][s] || 0) + value
+
+      // Hores acumulades (sempre, per l'etiqueta)
+      const hk = `__h__${s}`
+      byDay[day][hk] = (byDay[day][hk] || 0) + r.durada_min / 60
     }
 
     const sectors = Array.from(sectorSet).sort()
 
     const chartData = Object.entries(byDay)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([day, sectorData]) => ({
+      .map(([day, data]) => ({
         date: format(parseISO(day), 'dd/MM', { locale: ca }),
-        fullDate: day,
-        ...sectorData,
+        ...data,
       }))
 
-    return { chartData, sectors }
+    return { chartData, sectors, numSectorMap }
   }, [records, metric])
 
   const unit = metric === 'mm' ? 'mm' : 'h'
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const formatTooltip = (value: any) => [`${Number(value).toFixed(2)} ${unit}`]
 
   if (chartData.length === 0) {
     return (
@@ -70,10 +101,10 @@ export default function IrrigationChart({ records, metric }: Props) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={420}>
+    <ResponsiveContainer width="100%" height={500}>
       <BarChart
         data={chartData}
-        margin={{ top: 10, right: 30, left: 10, bottom: 60 }}
+        margin={{ top: 70, right: 30, left: 10, bottom: 60 }}
         barCategoryGap="20%"
         barGap={2}
       >
@@ -96,7 +127,13 @@ export default function IrrigationChart({ records, metric }: Props) {
             style: { fontSize: 12, fill: '#6b7280' },
           }}
         />
-        <Tooltip formatter={formatTooltip} />
+        <Tooltip
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          formatter={(value: any, name: string) => [
+            `${Number(value).toFixed(2)} ${unit}`,
+            name,
+          ]}
+        />
         <Legend
           wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }}
           formatter={(value) => value.length > 25 ? value.substring(0, 25) + '…' : value}
@@ -107,6 +144,7 @@ export default function IrrigationChart({ records, metric }: Props) {
             dataKey={sector}
             fill={COLORS[i % COLORS.length]}
             radius={[3, 3, 0, 0]}
+            label={makeBarLabel(numSectorMap[sector] ?? '?', `__h__${sector}`, chartData)}
           />
         ))}
       </BarChart>
