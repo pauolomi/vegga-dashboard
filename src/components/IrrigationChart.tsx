@@ -71,7 +71,12 @@ export default function IrrigationChart({ records, metric }: Props) {
 
   return (
     <ResponsiveContainer width="100%" height={420}>
-      <BarChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 60 }}>
+      <BarChart
+        data={chartData}
+        margin={{ top: 10, right: 30, left: 10, bottom: 60 }}
+        barCategoryGap="20%"
+        barGap={2}
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
         <XAxis
           dataKey="date"
@@ -100,9 +105,8 @@ export default function IrrigationChart({ records, metric }: Props) {
           <Bar
             key={sector}
             dataKey={sector}
-            stackId="a"
             fill={COLORS[i % COLORS.length]}
-            radius={i === sectors.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+            radius={[3, 3, 0, 0]}
           />
         ))}
       </BarChart>
