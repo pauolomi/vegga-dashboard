@@ -58,9 +58,8 @@ export default function IrrigationChart({ records, metric }: Props) {
 
   const unit = metric === 'mm' ? 'mm' : 'h'
 
-  const formatTooltip = (value: number | string) => [
-    `${Number(value).toFixed(2)} ${unit}`,
-  ]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const formatTooltip = (value: any) => [`${Number(value).toFixed(2)} ${unit}`]
 
   if (chartData.length === 0) {
     return (
