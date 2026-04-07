@@ -129,10 +129,7 @@ export default function IrrigationChart({ records, metric }: Props) {
         />
         <Tooltip
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any, name: string) => [
-            `${Number(value).toFixed(2)} ${unit}`,
-            name,
-          ]}
+          formatter={(value: any) => [`${Number(value).toFixed(2)} ${unit}`]}
         />
         <Legend
           wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }}
