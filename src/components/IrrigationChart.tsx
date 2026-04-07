@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { IrrigationRecord } from '@/lib/types'
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { format, parseISO } from 'date-fns'
 import { ca } from 'date-fns/locale'
 
@@ -56,6 +56,8 @@ function makeBarLabel(numSector: number | string, hoursKey: string, chartData: a
 }
 
 export default function IrrigationChart({ records, metric }: Props) {
+  const [hiddenSectors, setHiddenSectors] = useState<Set<string>>(new Set())
+
   const { chartData, sectors, numSectorMap } = useMemo(() => {
     const byDay: Record<string, Record<string, number>> = {}
     const sectorSet = new Set<string>()
@@ -69,11 +71,9 @@ export default function IrrigationChart({ records, metric }: Props) {
       sectorSet.add(s)
       numSectorMap[s] = r.num_sector
 
-      // Valor del mètric principal (mm o hores)
       const value = metric === 'mm' ? r.lamina_mm : r.durada_min / 60
       byDay[day][s] = (byDay[day][s] || 0) + value
 
-      // Hores acumulades (sempre, per l'etiqueta)
       const hk = `__h__${s}`
       byDay[day][hk] = (byDay[day][hk] || 0) + r.durada_min / 60
     }
@@ -89,6 +89,18 @@ export default function IrrigationChart({ records, metric }: Props) {
 
     return { chartData, sectors, numSectorMap }
   }, [records, metric])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleLegendClick = useCallback((payload: any) => {
+    const key = payload?.dataKey as string | undefined
+    if (!key) return
+    setHiddenSectors(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
 
   const unit = metric === 'mm' ? 'mm' : 'h'
 
@@ -132,8 +144,16 @@ export default function IrrigationChart({ records, metric }: Props) {
           formatter={(value: any) => [`${Number(value).toFixed(2)} ${unit}`]}
         />
         <Legend
-          wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }}
-          formatter={(value) => value.length > 25 ? value.substring(0, 25) + '…' : value}
+          wrapperStyle={{ paddingTop: '20px', fontSize: '12px', cursor: 'pointer' }}
+          formatter={(value, entry) => (
+            <span style={{
+              color: hiddenSectors.has(entry.dataKey as string) ? '#9ca3af' : '#111827',
+              textDecoration: hiddenSectors.has(entry.dataKey as string) ? 'line-through' : 'none',
+            }}>
+              {value.length > 25 ? value.substring(0, 25) + '…' : value}
+            </span>
+          )}
+          onClick={handleLegendClick}
         />
         {sectors.map((sector, i) => (
           <Bar
@@ -141,6 +161,7 @@ export default function IrrigationChart({ records, metric }: Props) {
             dataKey={sector}
             fill={COLORS[i % COLORS.length]}
             radius={[3, 3, 0, 0]}
+            hide={hiddenSectors.has(sector)}
             label={makeBarLabel(numSectorMap[sector] ?? '?', `__h__${sector}`, chartData)}
           />
         ))}
