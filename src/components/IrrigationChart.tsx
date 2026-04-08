@@ -1,14 +1,8 @@
 'use client'
 
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, LabelList, ResponsiveContainer,
 } from 'recharts'
 import { IrrigationRecord } from '@/lib/types'
 import { useMemo, useState, useCallback } from 'react'
@@ -26,17 +20,18 @@ interface Props {
   metric: 'mm' | 'hours'
 }
 
-// Label vertical sobre cada barra: "S14 · 2.5h"
+// Label vertical: "S14 · 35min"
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function makeBarLabel(numSector: number | string, hoursKey: string, chartData: any[]) {
+function makeLabel(numSector: number | string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function BarLabel(props: any) {
-    const { x, y, width, value, index } = props
-    if (!value || value === 0 || width < 5) return null
+    const { x, y, width, value } = props
+    // value = minuts del sector (des de __m__sector)
+    if (!value || Number(value) === 0 || !width || width < 5) return null
 
-    const hours = chartData[index]?.[hoursKey] ?? value
     const cx = x + width / 2
     const cy = y - 5
+    const mins = Math.round(Number(value))
 
     return (
       <text
@@ -49,7 +44,7 @@ function makeBarLabel(numSector: number | string, hoursKey: string, chartData: a
         fill="#1f2937"
         fontWeight={600}
       >
-        {`S${numSector} · ${Number(hours).toFixed(1)}h`}
+        {`S${numSector} · ${mins}min`}
       </text>
     )
   }
@@ -71,11 +66,13 @@ export default function IrrigationChart({ records, metric }: Props) {
       sectorSet.add(s)
       numSectorMap[s] = r.num_sector
 
+      // Valor principal (mm o hores)
       const value = metric === 'mm' ? r.lamina_mm : r.durada_min / 60
       byDay[day][s] = (byDay[day][s] || 0) + value
 
-      const hk = `__h__${s}`
-      byDay[day][hk] = (byDay[day][hk] || 0) + r.durada_min / 60
+      // Minuts (sempre, per les etiquetes)
+      const mk = `__m__${s}`
+      byDay[day][mk] = (byDay[day][mk] || 0) + r.durada_min
     }
 
     const sectors = Array.from(sectorSet).sort()
@@ -96,23 +93,15 @@ export default function IrrigationChart({ records, metric }: Props) {
     if (!key) return
     setHiddenSectors(prev => {
       const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
+      next.has(key) ? next.delete(key) : next.add(key)
       return next
     })
   }, [])
 
-  const unit = metric === 'mm' ? 'mm' : 'h'
-
   const allHidden = sectors.length > 0 && sectors.every(s => hiddenSectors.has(s))
+  const toggleAll = () => setHiddenSectors(allHidden ? new Set() : new Set(sectors))
 
-  const toggleAll = () => {
-    if (allHidden) {
-      setHiddenSectors(new Set())
-    } else {
-      setHiddenSectors(new Set(sectors))
-    }
-  }
+  const unit = metric === 'mm' ? 'mm' : 'h'
 
   if (chartData.length === 0) {
     return (
@@ -124,7 +113,6 @@ export default function IrrigationChart({ records, metric }: Props) {
 
   return (
     <div>
-      {/* Botó deseleccionar / seleccionar tot */}
       <div className="flex justify-end mb-2">
         <button
           onClick={toggleAll}
@@ -133,60 +121,67 @@ export default function IrrigationChart({ records, metric }: Props) {
           {allHidden ? '☑ Seleccionar tots' : '☐ Deseleccionar tots'}
         </button>
       </div>
-    <ResponsiveContainer width="100%" height={500}>
-      <BarChart
-        data={chartData}
-        margin={{ top: 70, right: 30, left: 10, bottom: 60 }}
-        barCategoryGap="20%"
-        barGap={2}
-      >
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis
-          dataKey="date"
-          tick={{ fontSize: 12 }}
-          angle={-35}
-          textAnchor="end"
-          interval={0}
-        />
-        <YAxis
-          tickFormatter={(v) => `${v.toFixed(1)}${unit}`}
-          tick={{ fontSize: 12 }}
-          label={{
-            value: metric === 'mm' ? 'Làmina (mm)' : 'Hores (h)',
-            angle: -90,
-            position: 'insideLeft',
-            offset: 10,
-            style: { fontSize: 12, fill: '#6b7280' },
-          }}
-        />
-        <Tooltip
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any) => [`${Number(value).toFixed(2)} ${unit}`]}
-        />
-        <Legend
-          wrapperStyle={{ paddingTop: '20px', fontSize: '12px', cursor: 'pointer' }}
-          formatter={(value, entry) => (
-            <span style={{
-              color: hiddenSectors.has(entry.dataKey as string) ? '#9ca3af' : '#111827',
-              textDecoration: hiddenSectors.has(entry.dataKey as string) ? 'line-through' : 'none',
-            }}>
-              {value.length > 25 ? value.substring(0, 25) + '…' : value}
-            </span>
-          )}
-          onClick={handleLegendClick}
-        />
-        {sectors.map((sector, i) => (
-          <Bar
-            key={sector}
-            dataKey={sector}
-            fill={COLORS[i % COLORS.length]}
-            radius={[3, 3, 0, 0]}
-            hide={hiddenSectors.has(sector)}
-            label={makeBarLabel(numSectorMap[sector] ?? '?', `__h__${sector}`, chartData)}
+
+      <ResponsiveContainer width="100%" height={500}>
+        <BarChart
+          data={chartData}
+          margin={{ top: 70, right: 30, left: 10, bottom: 60 }}
+          barCategoryGap="20%"
+          barGap={2}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 12 }}
+            angle={-35}
+            textAnchor="end"
+            interval={0}
           />
-        ))}
-      </BarChart>
-    </ResponsiveContainer>
+          <YAxis
+            tickFormatter={(v) => `${v.toFixed(1)}${unit}`}
+            tick={{ fontSize: 12 }}
+            label={{
+              value: metric === 'mm' ? 'Làmina (mm)' : 'Hores (h)',
+              angle: -90,
+              position: 'insideLeft',
+              offset: 10,
+              style: { fontSize: 12, fill: '#6b7280' },
+            }}
+          />
+          <Tooltip
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            formatter={(value: any) => [`${Number(value).toFixed(2)} ${unit}`]}
+          />
+          <Legend
+            wrapperStyle={{ paddingTop: '20px', fontSize: '12px', cursor: 'pointer' }}
+            formatter={(value, entry) => (
+              <span style={{
+                color: hiddenSectors.has(entry.dataKey as string) ? '#9ca3af' : '#111827',
+                textDecoration: hiddenSectors.has(entry.dataKey as string) ? 'line-through' : 'none',
+              }}>
+                {value.length > 25 ? value.substring(0, 25) + '…' : value}
+              </span>
+            )}
+            onClick={handleLegendClick}
+          />
+          {sectors.map((sector, i) => (
+            <Bar
+              key={sector}
+              dataKey={sector}
+              fill={COLORS[i % COLORS.length]}
+              radius={[3, 3, 0, 0]}
+              hide={hiddenSectors.has(sector)}
+            >
+              {/* LabelList llegeix __m__sector directament de cada entrada de dades */}
+              <LabelList
+                dataKey={`__m__${sector}`}
+                position="top"
+                content={makeLabel(numSectorMap[sector] ?? '?')}
+              />
+            </Bar>
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   )
 }
