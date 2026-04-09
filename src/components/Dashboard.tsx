@@ -89,14 +89,17 @@ export default function Dashboard() {
   const totalHours     = visibleRecords.reduce((s, r) => s + Number(r.durada_min), 0) / 60
   const numSectors     = new Set(visibleRecords.map(r => r.sector)).size
 
-  // KPI: Kc real del sector seleccionat
-  const sectorLamina = records
-    .filter(r => r.sector === selectedSector)
-    .reduce((s, r) => s + Number(r.lamina_mm), 0)
-  const kc = totalEto > 0 ? sectorLamina / totalEto : null
+  // Llista de sectors visibles (ordenats) — usada per Kc i dropdown
+  const allSectors = [...new Set(visibleRecords.map(r => r.sector))].sort()
 
-  // Llista de sectors disponibles (ordenats)
-  const allSectors = [...new Set(records.map(r => r.sector))].sort()
+  // Si el sector seleccionat ha quedat ocult, auto-seleccionar el primer visible
+  const activeSector = allSectors.includes(selectedSector) ? selectedSector : (allSectors[0] ?? '')
+
+  // KPI: Kc real del sector seleccionat (només sectors visibles)
+  const sectorLamina = visibleRecords
+    .filter(r => r.sector === activeSector)
+    .reduce((s, r) => s + Number(r.lamina_mm), 0)
+  const kc = totalEto > 0 && activeSector ? sectorLamina / totalEto : null
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -185,7 +188,7 @@ export default function Dashboard() {
               <p className="text-xs text-gray-500 uppercase tracking-wide">Kc real de reg</p>
               {allSectors.length > 0 && (
                 <select
-                  value={selectedSector}
+                  value={activeSector}
                   onChange={e => setSelectedSector(e.target.value)}
                   className="text-xs border border-gray-200 rounded-md px-2 py-1 text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[180px]"
                 >
@@ -199,7 +202,7 @@ export default function Dashboard() {
               {loading ? '…' : kc !== null ? kc.toFixed(2) : '—'}
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              {selectedSector
+              {activeSector
                 ? `Làmina: ${sectorLamina.toFixed(1)} mm / ETo: ${totalEto.toFixed(1)} mm`
                 : 'Selecciona un sector'}
             </p>
