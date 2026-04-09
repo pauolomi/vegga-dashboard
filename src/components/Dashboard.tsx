@@ -8,29 +8,48 @@ import { format, subDays } from 'date-fns'
 type Period = '1d' | '3d' | '7d' | 'custom'
 type Metric = 'mm' | 'hours'
 
+interface EtoDay { date: string; eto: number }
+
 export default function Dashboard() {
-  const [records, setRecords]   = useState<IrrigationRecord[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [syncing, setSyncing]   = useState(false)
-  const [syncMsg, setSyncMsg]   = useState<string | null>(null)
-  const [metric, setMetric]     = useState<Metric>('mm')
-  const [period, setPeriod]     = useState<Period>('3d')
+  const [records, setRecords]           = useState<IrrigationRecord[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [syncing, setSyncing]           = useState(false)
+  const [syncMsg, setSyncMsg]           = useState<string | null>(null)
+  const [metric, setMetric]             = useState<Metric>('mm')
+  const [period, setPeriod]             = useState<Period>('3d')
   const [fromDate, setFromDate]         = useState(format(subDays(new Date(), 3), 'yyyy-MM-dd'))
   const [toDate, setToDate]             = useState(format(new Date(), 'yyyy-MM-dd'))
   const [hiddenSectors, setHiddenSectors] = useState<Set<string>>(new Set())
+  const [etoDays, setEtoDays]           = useState<EtoDay[]>([])
+  const [totalEto, setTotalEto]         = useState<number>(0)
+  const [selectedSector, setSelectedSector] = useState<string>('')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const res  = await fetch(`/api/records?from=${fromDate}&to=${toDate}`)
-      const data = await res.json()
-      setRecords(data.records || [])
+      const [recRes, etoRes] = await Promise.all([
+        fetch(`/api/records?from=${fromDate}&to=${toDate}`),
+        fetch(`/api/eto?from=${fromDate}&to=${toDate}`),
+      ])
+      const recData = await recRes.json()
+      const etoData = await etoRes.json()
+
+      const recs = recData.records || []
+      setRecords(recs)
+      setEtoDays(etoData.days || [])
+      setTotalEto(etoData.totalEto || 0)
+
+      // Auto-seleccionar primer sector si no n'hi ha cap
+      if (!selectedSector && recs.length > 0) {
+        const sectors = [...new Set(recs.map((r: IrrigationRecord) => r.sector))] as string[]
+        setSelectedSector(sectors[0])
+      }
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
     }
-  }, [fromDate, toDate])
+  }, [fromDate, toDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -64,10 +83,20 @@ export default function Dashboard() {
     }
   }
 
+  // KPI: sectors visibles
   const visibleRecords = records.filter(r => !hiddenSectors.has(r.sector))
-  const totalMm    = visibleRecords.reduce((s, r) => s + Number(r.lamina_mm), 0)
-  const totalHours = visibleRecords.reduce((s, r) => s + Number(r.durada_min), 0) / 60
-  const numSectors = new Set(visibleRecords.map((r) => r.sector)).size
+  const totalMm        = visibleRecords.reduce((s, r) => s + Number(r.lamina_mm), 0)
+  const totalHours     = visibleRecords.reduce((s, r) => s + Number(r.durada_min), 0) / 60
+  const numSectors     = new Set(visibleRecords.map(r => r.sector)).size
+
+  // KPI: Kc real del sector seleccionat
+  const sectorLamina = records
+    .filter(r => r.sector === selectedSector)
+    .reduce((s, r) => s + Number(r.lamina_mm), 0)
+  const kc = totalEto > 0 ? sectorLamina / totalEto : null
+
+  // Llista de sectors disponibles (ordenats)
+  const allSectors = [...new Set(records.map(r => r.sector))].sort()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -84,7 +113,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Botó sincronitzar */}
           <div className="flex items-center gap-3">
             {syncMsg && (
               <span className={`text-sm font-medium ${syncMsg.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>
@@ -110,19 +138,71 @@ export default function Dashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        {/* KPIs */}
+
+        {/* KPIs — fila 1: reg */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-xs text-gray-500 uppercase tracking-wide">Làmina total</p>
             <p className="text-2xl font-bold text-blue-600 mt-1">{totalMm.toFixed(1)} mm</p>
+            <p className="text-xs text-gray-400 mt-1">sectors visibles</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-xs text-gray-500 uppercase tracking-wide">Hores totals</p>
             <p className="text-2xl font-bold text-green-600 mt-1">{totalHours.toFixed(1)} h</p>
+            <p className="text-xs text-gray-400 mt-1">sectors visibles</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-xs text-gray-500 uppercase tracking-wide">Sectors actius</p>
             <p className="text-2xl font-bold text-purple-600 mt-1">{numSectors}</p>
+          </div>
+        </div>
+
+        {/* KPIs — fila 2: ETo i Kc */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* ETo acumulada */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wide">ETo acumulada (Lleida)</p>
+            <p className="text-2xl font-bold text-orange-500 mt-1">
+              {loading ? '…' : `${totalEto.toFixed(1)} mm`}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              FAO Penman-Monteith · {fromDate} → {toDate}
+            </p>
+            {etoDays.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1">
+                {etoDays.map(d => (
+                  <span key={d.date} className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">
+                    {d.date.slice(5)}: {d.eto.toFixed(1)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Kc real */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Kc real de reg</p>
+              {allSectors.length > 0 && (
+                <select
+                  value={selectedSector}
+                  onChange={e => setSelectedSector(e.target.value)}
+                  className="text-xs border border-gray-200 rounded-md px-2 py-1 text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 max-w-[180px]"
+                >
+                  {allSectors.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <p className="text-2xl font-bold text-teal-600 mt-1">
+              {loading ? '…' : kc !== null ? kc.toFixed(2) : '—'}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {selectedSector
+                ? `Làmina: ${sectorLamina.toFixed(1)} mm / ETo: ${totalEto.toFixed(1)} mm`
+                : 'Selecciona un sector'}
+            </p>
           </div>
         </div>
 
