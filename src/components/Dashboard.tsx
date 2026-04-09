@@ -15,8 +15,9 @@ export default function Dashboard() {
   const [syncMsg, setSyncMsg]   = useState<string | null>(null)
   const [metric, setMetric]     = useState<Metric>('mm')
   const [period, setPeriod]     = useState<Period>('3d')
-  const [fromDate, setFromDate] = useState(format(subDays(new Date(), 3), 'yyyy-MM-dd'))
-  const [toDate, setToDate]     = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [fromDate, setFromDate]         = useState(format(subDays(new Date(), 3), 'yyyy-MM-dd'))
+  const [toDate, setToDate]             = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [hiddenSectors, setHiddenSectors] = useState<Set<string>>(new Set())
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -63,9 +64,10 @@ export default function Dashboard() {
     }
   }
 
-  const totalMm    = records.reduce((s, r) => s + Number(r.lamina_mm), 0)
-  const totalHours = records.reduce((s, r) => s + Number(r.durada_min), 0) / 60
-  const numSectors = new Set(records.map((r) => r.sector)).size
+  const visibleRecords = records.filter(r => !hiddenSectors.has(r.sector))
+  const totalMm    = visibleRecords.reduce((s, r) => s + Number(r.lamina_mm), 0)
+  const totalHours = visibleRecords.reduce((s, r) => s + Number(r.durada_min), 0) / 60
+  const numSectors = new Set(visibleRecords.map((r) => r.sector)).size
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -172,7 +174,12 @@ export default function Dashboard() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
             </div>
           ) : (
-            <IrrigationChart records={records} metric={metric} />
+            <IrrigationChart
+              records={records}
+              metric={metric}
+              hiddenSectors={hiddenSectors}
+              onHiddenSectorsChange={setHiddenSectors}
+            />
           )}
         </div>
 

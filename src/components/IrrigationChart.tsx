@@ -5,7 +5,7 @@ import {
   Tooltip, Legend, LabelList, ResponsiveContainer,
 } from 'recharts'
 import { IrrigationRecord } from '@/lib/types'
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useCallback } from 'react'
 import { format, parseISO } from 'date-fns'
 import { ca } from 'date-fns/locale'
 
@@ -18,6 +18,8 @@ const COLORS = [
 interface Props {
   records: IrrigationRecord[]
   metric: 'mm' | 'hours'
+  hiddenSectors: Set<string>
+  onHiddenSectorsChange: (s: Set<string>) => void
 }
 
 // Label vertical: "S14 · 35min"
@@ -50,8 +52,7 @@ function makeLabel(numSector: number | string) {
   }
 }
 
-export default function IrrigationChart({ records, metric }: Props) {
-  const [hiddenSectors, setHiddenSectors] = useState<Set<string>>(new Set())
+export default function IrrigationChart({ records, metric, hiddenSectors, onHiddenSectorsChange }: Props) {
 
   const { chartData, sectors, numSectorMap } = useMemo(() => {
     const byDay: Record<string, Record<string, number>> = {}
@@ -91,15 +92,13 @@ export default function IrrigationChart({ records, metric }: Props) {
   const handleLegendClick = useCallback((payload: any) => {
     const key = payload?.dataKey as string | undefined
     if (!key) return
-    setHiddenSectors(prev => {
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      return next
-    })
-  }, [])
+    const next = new Set(hiddenSectors)
+    next.has(key) ? next.delete(key) : next.add(key)
+    onHiddenSectorsChange(next)
+  }, [hiddenSectors, onHiddenSectorsChange])
 
   const allHidden = sectors.length > 0 && sectors.every(s => hiddenSectors.has(s))
-  const toggleAll = () => setHiddenSectors(allHidden ? new Set() : new Set(sectors))
+  const toggleAll = () => onHiddenSectorsChange(allHidden ? new Set() : new Set(sectors))
 
   const unit = metric === 'mm' ? 'mm' : 'h'
 
