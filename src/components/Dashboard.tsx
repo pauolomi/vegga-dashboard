@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import IrrigationChart from './IrrigationChart'
+import FertilizerSection from './FertilizerSection'
 import { IrrigationRecord } from '@/lib/types'
 import { format, subDays } from 'date-fns'
 
 type Period = '1d' | '3d' | '7d' | 'custom'
 type Metric = 'mm' | 'hours'
+type Tab    = 'reg' | 'fertilitzants'
 
 interface EtoDay { date: string; eto: number }
 
@@ -20,6 +22,7 @@ export default function Dashboard() {
   const [fromDate, setFromDate]         = useState(format(subDays(new Date(), 3), 'yyyy-MM-dd'))
   const [toDate, setToDate]             = useState(format(new Date(), 'yyyy-MM-dd'))
   const [hiddenSectors, setHiddenSectors] = useState<Set<string>>(new Set())
+  const [activeTab, setActiveTab]         = useState<Tab>('reg')
   const [etoDays, setEtoDays]           = useState<EtoDay[]>([])
   const [totalEto, setTotalEto]         = useState<number>(0)
   const [selectedSector, setSelectedSector] = useState<string>('')
@@ -140,7 +143,35 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 flex gap-1 pt-2">
+          {([
+            { id: 'reg',           label: '💧 Reg' },
+            { id: 'fertilitzants', label: '🌿 Fertilitzants' },
+          ] as { id: Tab; label: string }[]).map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+                activeTab === t.id
+                  ? 'border-blue-600 text-blue-600 bg-blue-50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+
+        {/* Secció Fertilitzants */}
+        {activeTab === 'fertilitzants' && <FertilizerSection />}
+
+        {/* Secció Reg */}
+        {activeTab === 'reg' && <>
 
         {/* KPIs — fila 1: reg */}
         <div className="grid grid-cols-3 gap-4">
@@ -303,6 +334,8 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        </> /* fi bloc reg */}
       </div>
     </div>
   )

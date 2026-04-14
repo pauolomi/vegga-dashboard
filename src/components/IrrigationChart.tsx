@@ -67,13 +67,13 @@ export default function IrrigationChart({ records, metric, hiddenSectors, onHidd
       sectorSet.add(s)
       numSectorMap[s] = r.num_sector
 
-      // Valor principal (mm o hores)
-      const value = metric === 'mm' ? r.lamina_mm : r.durada_min / 60
+      // Valor principal (mm o hores) — forcem Number() perquè Neon retorna decimals com a strings
+      const value = metric === 'mm' ? Number(r.lamina_mm) : Number(r.durada_min) / 60
       byDay[day][s] = (byDay[day][s] || 0) + value
 
       // Minuts (sempre, per les etiquetes)
       const mk = `__m__${s}`
-      byDay[day][mk] = (byDay[day][mk] || 0) + r.durada_min
+      byDay[day][mk] = (byDay[day][mk] || 0) + Number(r.durada_min)
     }
 
     const sectors = Array.from(sectorSet).sort()
